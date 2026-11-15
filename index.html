@@ -87,22 +87,35 @@
         }
         button { cursor: pointer; user-select: none; }
 
-        /* Royal Arabic Heritage Certificate Styling */
+        /* Royal Arabic Heritage Certificate Styling - Exact A4 Landscape, No Drop Shadow */
         .royal-certificate {
             background: radial-gradient(circle at center, #fffdf9 0%, #f7efda 70%, #ede0c0 100%);
             color: #1e293b;
             position: relative;
             border: 8px solid #78350f;
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65), inset 0 0 40px rgba(180, 83, 9, 0.18);
+            box-shadow: none !important;
             overflow: hidden;
+            width: 100%;
+            max-width: 297mm;
+            aspect-ratio: 297 / 210;
+            margin: 0 auto;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: stretch;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
         .royal-cert-inner-frame {
             border: 3px double #b45309;
-            margin: 12px;
-            padding: 28px 32px;
+            margin: 10px;
+            padding: 16px 28px;
             position: relative;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-sizing: border-box;
             background-image: radial-gradient(#d97706 0.55px, transparent 0.55px);
             background-size: 22px 22px;
             background-color: rgba(255, 253, 248, 0.92);
@@ -120,7 +133,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             font-family: 'Aref Ruqaa', serif;
-            font-size: 260px;
+            font-size: 230px;
             color: rgba(180, 83, 9, 0.045);
             pointer-events: none;
             user-select: none;
@@ -128,12 +141,12 @@
             z-index: 0;
         }
         .royal-seal {
-            width: 115px;
-            height: 115px;
+            width: 96px;
+            height: 96px;
             background: radial-gradient(circle, #fbbf24 0%, #d97706 65%, #78350f 100%);
             border: 3px double #fffbeb;
             border-radius: 50%;
-            box-shadow: 0 6px 20px rgba(120, 53, 15, 0.45), 0 0 0 4px #b45309;
+            box-shadow: 0 0 0 4px #b45309;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -733,8 +746,8 @@
             </div>
 
             <!-- Live Certificate Preview Container -->
-            <div class="max-w-5xl mx-auto overflow-x-auto pb-6">
-                <div id="certificateLivePreview" class="min-w-[780px]"></div>
+            <div class="max-w-6xl mx-auto overflow-x-auto pb-6">
+                <div id="certificateLivePreview" class="min-w-[850px]"></div>
             </div>
         </div>
 
@@ -1288,12 +1301,16 @@
                 }
             });
 
-            // إضافة تلقائية في "فرسان التفوق" لكل طالب حقق اللون الأزرق (85% - 100%)
+            // إضافة تلقائية في "فرسان التفوق" لكل طالب حقق الشارة الماسية (100%) أو الزرقاء (85% إلى أقل من 100%)
             const roster = getRoster();
             roster.forEach(studentName => {
                 const stats = getStudentAcademicStats(studentName, currentClass);
-                if (stats.blueCount > 0) {
-                    const autoReason = `🔵 المستوى الأزرق في التقييمات (${stats.blueCount} تقييم متميز = +${stats.bonusStars} ⭐ إضافية)`;
+                const excelCount = (stats.diamondCount || 0) + (stats.blueCount || 0);
+                if (excelCount > 0) {
+                    const parts = [];
+                    if (stats.diamondCount > 0) parts.push(`💎 ماسية 100%: ${stats.diamondCount}`);
+                    if (stats.blueCount > 0) parts.push(`🔵 زرقاء: ${stats.blueCount}`);
+                    const autoReason = `${parts.join(' | ')} (مكافأة التقييمات: +${stats.evalBonusStars} ⭐)`;
                     const key = studentName.trim();
                     if (!mergedMap[key]) {
                         const newEntry = {
@@ -1301,8 +1318,8 @@
                             name: key,
                             category: 'excellence',
                             photo: '',
-                            count: stats.blueCount,
-                            catCounts: { excellence: stats.blueCount },
+                            count: excelCount,
+                            catCounts: { excellence: excelCount },
                             honorsList: [{ category: 'excellence', reason: autoReason }],
                             reason: `🏆 ${autoReason}`
                         };
@@ -1311,7 +1328,7 @@
                     } else {
                         const existing = mergedMap[key];
                         if (!existing.honorsList.some(h => h.reason === autoReason)) {
-                            existing.catCounts['excellence'] = (existing.catCounts['excellence'] || 0) + stats.blueCount;
+                            existing.catCounts['excellence'] = (existing.catCounts['excellence'] || 0) + excelCount;
                             existing.count = Object.values(existing.catCounts).reduce((a, b) => a + b, 0);
                             existing.honorsList.push({ category: 'excellence', reason: autoReason });
                             existing.reason = existing.honorsList.map(h => `${getCategoryMedalMeta(h.category).icon} ${h.reason}`).join(' ✦ ');
@@ -1454,7 +1471,7 @@
             return Math.min(100, Math.max(0, (num / max) * 100));
         }
 
-        // تحديد اللون والمستوى والنجوم الـ 3 الإضافية حسب النسبة المئوية
+        // تحديد الشارة والمستوى والنجوم الإضافية تلقائياً حسب النسبة المئوية
         function getGradeColorMeta(percentage) {
             if (percentage === null || percentage === undefined || isNaN(percentage)) {
                 return {
@@ -1463,48 +1480,64 @@
                     dot: '⚪',
                     pctText: '',
                     bonusStars: 0,
+                    starText: '',
                     badgeClass: 'bg-slate-800 text-slate-400 border-slate-700',
                     inputClass: 'bg-slate-900 border-slate-700 text-white'
                 };
             }
             const pctRound = Math.round(percentage);
-            if (percentage >= 85) {
+            if (percentage >= 100) {
+                return {
+                    key: 'diamond',
+                    label: 'شارة ماسية 💎 100%',
+                    dot: '💎',
+                    pctText: '100%',
+                    bonusStars: 3, // +3 نجوم للدرجة النهائية 100%
+                    starText: '(+3⭐)',
+                    badgeClass: 'bg-cyan-500/25 text-cyan-200 border-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.45)]',
+                    inputClass: 'bg-cyan-950/80 border-cyan-300 text-cyan-200'
+                };
+            } else if (percentage >= 85) {
                 return {
                     key: 'blue',
-                    label: 'الأزرق (85% - 100%)',
+                    label: 'شارة زرقاء 🔵 (85% - 99%)',
                     dot: '🔵',
                     pctText: `${pctRound}%`,
-                    bonusStars: 3, // 3 نجوم إضافية للتفوق
+                    bonusStars: 2, // +2 نجمتان من 85% إلى أقل من 100%
+                    starText: '(+2⭐)',
                     badgeClass: 'bg-sky-500/20 text-sky-300 border-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.3)]',
                     inputClass: 'bg-sky-950/80 border-sky-400 text-sky-200'
                 };
             } else if (percentage >= 65) {
                 return {
                     key: 'green',
-                    label: 'الأخضر (65% - 84%)',
-                    dot: '🟢',
+                    label: 'المستوى الأخضر والأصفر 🟢 / 🟡 (65% - 84%)',
+                    dot: '🟢 / 🟡',
                     pctText: `${pctRound}%`,
-                    bonusStars: 0,
+                    bonusStars: 1, // +1 نجمة من 50% إلى أقل من 85%
+                    starText: '(+1⭐)',
                     badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-400',
                     inputClass: 'bg-emerald-950/80 border-emerald-400 text-emerald-200'
                 };
             } else if (percentage >= 50) {
                 return {
                     key: 'yellow',
-                    label: 'الأصفر (50% - 64%)',
-                    dot: '🟡',
+                    label: 'المستوى الأخضر والأصفر 🟢 / 🟡 (50% - 64%)',
+                    dot: '🟢 / 🟡',
                     pctText: `${pctRound}%`,
-                    bonusStars: 0,
+                    bonusStars: 1, // +1 نجمة من 50% إلى أقل من 85%
+                    starText: '(+1⭐)',
                     badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-400',
                     inputClass: 'bg-amber-950/80 border-amber-400 text-amber-200'
                 };
             } else {
                 return {
                     key: 'red',
-                    label: 'الأحمر (أقل من 50%)',
+                    label: 'المستوى الأحمر 🔴 (أقل من 50%)',
                     dot: '🔴',
                     pctText: `${pctRound}%`,
-                    bonusStars: 0,
+                    bonusStars: 0, // 0 نجوم لأقل من 50%
+                    starText: '(0 ⭐)',
                     badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-400',
                     inputClass: 'bg-rose-950/80 border-rose-400 text-rose-200'
                 };
@@ -1523,24 +1556,33 @@
             let absentDays = 0;
             let excusedDays = 0;
             let hwCompleted = 0;
+            let hwBonusStars = 0;
+            let evalBonusStars = 0;
             let quizPercentages = [];
             let examPercentages = [];
-            let bonusStars = 0;
+            let diamondCount = 0;
             let blueCount = 0;
+            let greenYellowCount = 0;
+            let redCount = 0;
 
             validWeeks.forEach(w => {
                 const wTracker = safeGet(`weekly_tracker_${targetClass}_${w}`, {}, 'object');
                 const maxQuiz = parseFloat(wTracker._maxQuiz) > 0 ? parseFloat(wTracker._maxQuiz) : 10;
                 const wSt = wTracker[studentName];
                 if (wSt) {
-                    if (wSt.hw) hwCompleted++;
+                    if (wSt.hw) {
+                        hwCompleted++;
+                        hwBonusStars += 1; // +1 نجمة تلقائياً لكل واجب أسبوعي مسلّم
+                    }
                     const pct = calcScorePercentage(wSt.quiz, maxQuiz);
                     if (pct !== null) {
                         quizPercentages.push(pct);
-                        if (pct >= 85) {
-                            bonusStars += 3;
-                            blueCount++;
-                        }
+                        const meta = getGradeColorMeta(pct);
+                        evalBonusStars += meta.bonusStars;
+                        if (pct >= 100) diamondCount++;
+                        else if (pct >= 85) blueCount++;
+                        else if (pct >= 50) greenYellowCount++;
+                        else redCount++;
                     }
                 }
                 days.forEach(d => {
@@ -1559,13 +1601,17 @@
                     const pct = calcScorePercentage(mSt.exam, maxExam);
                     if (pct !== null) {
                         examPercentages.push(pct);
-                        if (pct >= 85) {
-                            bonusStars += 3;
-                            blueCount++;
-                        }
+                        const meta = getGradeColorMeta(pct);
+                        evalBonusStars += meta.bonusStars;
+                        if (pct >= 100) diamondCount++;
+                        else if (pct >= 85) blueCount++;
+                        else if (pct >= 50) greenYellowCount++;
+                        else redCount++;
                     }
                 }
             });
+
+            const bonusStars = hwBonusStars + evalBonusStars;
 
             const avgQuizPct = quizPercentages.length > 0
                 ? (quizPercentages.reduce((a, b) => a + b, 0) / quizPercentages.length)
@@ -1584,22 +1630,22 @@
             const examColor = getGradeColorMeta(avgExamPct);
             const overallColor = getGradeColorMeta(overallPct);
 
-            const avgQuiz = avgQuizPct !== null ? `${Math.round(avgQuizPct)}% (${quizColor.dot})` : 'لم يُرصد';
-            const avgExam = avgExamPct !== null ? `${Math.round(avgExamPct)}% (${examColor.dot})` : 'لم يُرصد';
+            const avgQuiz = avgQuizPct !== null ? `${Math.round(avgQuizPct)}% (${quizColor.dot} ${quizColor.starText})` : 'لم يُرصد';
+            const avgExam = avgExamPct !== null ? `${Math.round(avgExamPct)}% (${examColor.dot} ${examColor.starText})` : 'لم يُرصد';
 
             const currentMTracker = safeGet(`monthly_data_${targetClass}_${currentMonth}`, {}, 'object');
             const curMaxExam = parseFloat(currentMTracker._maxExam) > 0 ? parseFloat(currentMTracker._maxExam) : 20;
             const rawCurrentExam = (currentMTracker[studentName] && currentMTracker[studentName].exam !== undefined && String(currentMTracker[studentName].exam).trim() !== '') ? currentMTracker[studentName].exam : '';
             const currentExamPct = calcScorePercentage(rawCurrentExam, curMaxExam);
             const currentExamColor = getGradeColorMeta(currentExamPct);
-            const currentMonthExam = rawCurrentExam !== '' ? `${rawCurrentExam} من ${curMaxExam} (${currentExamColor.dot} ${currentExamColor.pctText})` : 'لم يُرصد';
+            const currentMonthExam = rawCurrentExam !== '' ? `${rawCurrentExam} من ${curMaxExam} (${currentExamColor.dot} ${currentExamColor.pctText} ${currentExamColor.starText})` : 'لم يُرصد';
 
             return {
-                absentDays, excusedDays, hwCompleted, totalWeeks: validWeeks.length,
+                absentDays, excusedDays, hwCompleted, hwBonusStars, evalBonusStars, totalWeeks: validWeeks.length,
                 avgQuiz, avgQuizPct, quizColor, quizCount: quizPercentages.length,
                 avgExam, avgExamPct, examColor, currentMonthExam,
                 overallPct, overallColor,
-                bonusStars, blueCount
+                bonusStars, diamondCount, blueCount, greenYellowCount, redCount
             };
         }
 
@@ -1640,36 +1686,43 @@
             safeSet(`term_data_${currentClass}_${currentTerm}`, tracker);
         }
 
-        // حساب نجوم الأيام فقط (بدون نجوم التقييمات الإضافية)
-        function calculateStudentDailyStarsOnly(studentName) {
+        // حساب نجوم الأيام فقط (بدون مكافأة الواجبات أو التقييمات)
+        function calculateStudentDailyStarsOnly(studentName, targetClass = currentClass) {
             let dailyStars = 0;
-            const weeks = getAvailableWeeks();
+            let default16 = [];
+            for (let i = 1; i <= 16; i++) default16.push(`week${i}`);
+            const weeks = safeGet(`weeks_list_${targetClass}`, default16, 'array');
+            const validWeeks = weeks.length > 0 ? weeks : default16;
             const days = ['sun', 'mon', 'tue', 'wed', 'thu'];
 
-            weeks.forEach(w => {
+            validWeeks.forEach(w => {
                 days.forEach(d => {
-                    const dailyTracker = getDailyTracker(w, d);
+                    const dailyTracker = safeGet(`daily_tracker_${targetClass}_${w}_${d}`, {}, 'object');
                     const st = dailyTracker[studentName];
+                    let sum = 0;
                     if (st) {
-                        if (st.p1) dailyStars++;
-                        if (st.p2) dailyStars++;
-                        if (st.p3) dailyStars++;
-                        if (st.p4) dailyStars++;
-                        if (st.p5) dailyStars++;
+                        sum = (st.p1 ? 1 : 0) + (st.p2 ? 1 : 0) + (st.p3 ? 1 : 0) + (st.p4 ? 1 : 0) + (st.p5 ? 1 : 0);
                     }
+                    if (sum === 0) {
+                        const weeklyTracker = safeGet(`weekly_tracker_${targetClass}_${w}`, {}, 'object');
+                        if (weeklyTracker[studentName] && weeklyTracker[studentName][d]) {
+                            sum = 5;
+                        }
+                    }
+                    dailyStars += sum;
                 });
             });
             return dailyStars;
         }
 
-        // المجموع الكلي للنقاط (نجوم الأيام + 3 نجوم إضافية لكل تقييم/اختبار باللون الأزرق)
-        function calculateStudentTotalScore(studentName) {
-            const dailyStars = calculateStudentDailyStarsOnly(studentName);
-            const stats = getStudentAcademicStats(studentName, currentClass);
-            return dailyStars + (stats.bonusStars || 0);
+        // المجموع الكلي للنجوم (نجوم الأيام + مكافأة الواجبات + مكافأة التقييمات)
+        function calculateStudentTotalScore(studentName, targetClass = currentClass) {
+            const dailyStars = calculateStudentDailyStarsOnly(studentName, targetClass);
+            const stats = getStudentAcademicStats(studentName, targetClass);
+            return dailyStars + (stats.hwBonusStars || 0) + (stats.evalBonusStars || 0);
         }
-        function getStudentKnightRank(studentName) {
-            const score = calculateStudentTotalScore(studentName);
+        function getStudentKnightRank(studentName, targetClass = currentClass) {
+            const score = calculateStudentTotalScore(studentName, targetClass);
             if (score > 50) return { title: "سلطان البلاغة", badge: "👑 سلطان البلاغة", color: "bg-amber-500/20 text-amber-300 border-amber-400" };
             if (score >= 31) return { title: "قائد الفصاحة", badge: "🛡️ قائد الفصاحة", color: "bg-purple-500/20 text-purple-300 border-purple-400" };
             if (score >= 16) return { title: "أمير الكلمة", badge: "🌟 أمير الكلمة", color: "bg-emerald-500/20 text-emerald-300 border-emerald-400" };
@@ -1677,7 +1730,7 @@
             return { title: "ساعي البيان", badge: "📜 ساعي البيان", color: "bg-slate-700 text-slate-300 border-slate-600" };
         }
 
-        // --- Google Classroom Export Function ---
+        // --- Google Classroom Export Function (CSV) ---
         function exportToGoogleClassroomExcel() {
             const roster = getRoster();
             if (roster.length === 0) {
@@ -1689,11 +1742,14 @@
             const exportData = [];
 
             roster.forEach(name => {
-                const totalStars = calculateStudentTotalScore(name);
+                const dailyStars = calculateStudentDailyStarsOnly(name);
+                const stats = getStudentAcademicStats(name);
+                const hwStars = stats.hwBonusStars || 0;
+                const evalStars = stats.evalBonusStars || 0;
+                const totalStars = dailyStars + hwStars + evalStars;
                 const rank = getStudentKnightRank(name);
                 const group = getStudentGroupName(name);
                 const termPts = getStudentTermPoints(name);
-                const stats = getStudentAcademicStats(name);
 
                 exportData.push({
                     "اسم الطالب": name,
@@ -1705,18 +1761,26 @@
                     "متوسط التقييم الأسبوعي": stats.avgQuiz,
                     "درجة اختبار الشهر الحالي": stats.currentMonthExam,
                     "متوسط اختبارات الشهور": stats.avgExam,
-                    "إجمالي النجوم الفردية": totalStars,
-                    "رتبة الفارس": rank.title,
+                    "نجوم الأيام": dailyStars,
+                    "مكافأة الواجبات (+1⭐)": hwStars,
+                    "مكافأة التقييمات (+1/2/3⭐)": evalStars,
+                    "تفصيل النجوم (أيام + واجبات + تقييمات)": `${dailyStars} أيام + ${hwStars} واجبات + ${evalStars} تقييمات = ${totalStars} ⭐`,
+                    "إجمالي النجوم الكلي": totalStars,
+                    "رتبة الفارس (ترقية تلقائية)": rank.title,
                     "نجوم حصاد الترم (من 400)": termPts,
                     "المادة": header.subject
                 });
             });
 
             const worksheet = XLSX.utils.json_to_sheet(exportData);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Google_Classroom_Grades");
-
-            XLSX.writeFile(workbook, `Google_Classroom_Scores_${getCurrentClassDisplayName()}_${new Date().toISOString().slice(0,10)}.xlsx`);
+            const csvContent = XLSX.utils.sheet_to_csv(worksheet);
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Google_Classroom_Scores_${getCurrentClassDisplayName()}_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
             triggerConfetti({ particleCount: 50, spread: 70 });
         }
 
@@ -2239,85 +2303,89 @@
             `;
 
             return `
-                <div class="royal-certificate rounded-2xl">
+                <div class="royal-certificate rounded-xl">
                     <div class="royal-cert-inner-frame">
                         <!-- Giant Arabic Daad Watermark -->
                         <div class="daad-watermark">ض</div>
 
                         <!-- 4 Islamic Geometric Corners -->
-                        <div style="position: absolute; top: 10px; right: 10px; z-index: 2;">${cornerOrnamentSVG}</div>
-                        <div style="position: absolute; top: 10px; left: 10px; transform: scaleX(-1); z-index: 2;">${cornerOrnamentSVG}</div>
-                        <div style="position: absolute; bottom: 10px; right: 10px; transform: scaleY(-1); z-index: 2;">${cornerOrnamentSVG}</div>
-                        <div style="position: absolute; bottom: 10px; left: 10px; transform: scale(-1, -1); z-index: 2;">${cornerOrnamentSVG}</div>
+                        <div style="position: absolute; top: 8px; right: 8px; z-index: 2;">${cornerOrnamentSVG}</div>
+                        <div style="position: absolute; top: 8px; left: 8px; transform: scaleX(-1); z-index: 2;">${cornerOrnamentSVG}</div>
+                        <div style="position: absolute; bottom: 8px; right: 8px; transform: scaleY(-1); z-index: 2;">${cornerOrnamentSVG}</div>
+                        <div style="position: absolute; bottom: 8px; left: 8px; transform: scale(-1, -1); z-index: 2;">${cornerOrnamentSVG}</div>
 
                         <!-- Certificate Content -->
-                        <div style="position: relative; z-index: 5; text-align: center; padding: 10px 24px;">
+                        <div style="position: relative; z-index: 5; text-align: center; padding: 4px 20px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
                             
-                            <!-- Top Basmala & Heritage Header -->
-                            <div class="font-amiri" style="font-size: 22px; font-weight: 700; color: #78350f; letter-spacing: 1px; margin-bottom: 6px;">
-                                بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
-                            </div>
-
-                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #d97706; padding-bottom: 10px; margin-bottom: 16px; font-size: 13px; font-weight: 800; color: #451a03;">
-                                <div>ديوان الفصحى والبيان العربي</div>
-                                <div style="background: linear-gradient(90deg, #78350f, #b45309, #78350f); color: #fef3c7; padding: 4px 18px; border-radius: 999px; font-size: 13px; box-shadow: 0 2px 8px rgba(120,53,15,0.3);">
-                                    ${badgeTitle} (${rank.title})
+                            <div>
+                                <!-- Top Basmala & Heritage Header -->
+                                <div class="font-amiri" style="font-size: 20px; font-weight: 700; color: #78350f; letter-spacing: 1px; margin-bottom: 4px;">
+                                    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
                                 </div>
-                                <div>الصف الثاني الإعدادي — فصل (${getCurrentClassDisplayName()})</div>
-                            </div>
 
-                            <!-- Main Royal Title -->
-                            <h1 class="font-ruqaa" style="font-size: 46px; font-weight: 700; color: #78350f; margin: 8px 0 6px 0; text-shadow: 0 2px 4px rgba(180,83,9,0.2);">
-                                شَهَادَةُ تَقْدِيرٍ وَتَفَوُّقٍ
-                            </h1>
-                            <div class="font-kufi" style="font-size: 15px; color: #92400e; font-weight: 700; margin-bottom: 16px;">
-                                ❖ فُرْسَانُ لُغَةِ الضَّادِ وَحُمَاةُ البَيَانِ ❖
-                            </div>
-
-                            <!-- Literary Preamble -->
-                            <p class="font-amiri" style="font-size: 20px; line-height: 1.8; color: #1e293b; max-width: 680px; margin: 0 auto 14px auto; font-weight: 700;">
-                                يَسُرُّ أُسْرَةَ <span style="color: #b45309;">${header.subject}</span> تَحْتَ إِشْرَافِ <span style="color: #78350f;">${header.teacher}</span> أَنْ تَمْنَحَ هَذِهِ الشَّهَادَةَ المَلَكِيَّةَ وَوِسَامَ الشَّرَفِ إِلَى الفَارِسِ النَّجِيبِ / الطَّالِبِ المُمَيَّزِ:
-                            </p>
-
-                            <!-- Honored Student Name Banner -->
-                            <div style="margin: 14px auto; max-width: 520px; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%); border: 3px double #b45309; border-radius: 18px; padding: 12px 24px; box-shadow: 0 8px 20px rgba(180, 83, 9, 0.18);">
-                                <div class="font-ruqaa" style="font-size: 36px; font-weight: 700; color: #78350f; line-height: 1.3;">
-                                    ${studentName}
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #d97706; padding-bottom: 8px; margin-bottom: 10px; font-size: 13px; font-weight: 800; color: #451a03;">
+                                    <div>ديوان الفصحى والبيان العربي</div>
+                                    <div style="background: linear-gradient(90deg, #78350f, #b45309, #78350f); color: #fef3c7; padding: 3px 16px; border-radius: 999px; font-size: 13px;">
+                                        ${badgeTitle} (${rank.title})
+                                    </div>
+                                    <div>الصف الثاني الإعدادي — فصل (${getCurrentClassDisplayName()})</div>
                                 </div>
-                                <div style="font-size: 13px; font-weight: 800; color: #92400e; margin-top: 4px;">الرتبة الحالية: ${rank.badge}</div>
+
+                                <!-- Main Royal Title -->
+                                <h1 class="font-ruqaa" style="font-size: 40px; font-weight: 700; color: #78350f; margin: 4px 0 4px 0;">
+                                    شَهَادَةُ تَقْدِيرٍ وَتَفَوُّقٍ
+                                </h1>
+                                <div class="font-kufi" style="font-size: 14px; color: #92400e; font-weight: 700; margin-bottom: 8px;">
+                                    ❖ فُرْسَانُ لُغَةِ الضَّادِ وَحُمَاةُ البَيَانِ ❖
+                                </div>
                             </div>
 
-                            <!-- Custom Citation Text -->
-                            <p class="font-amiri" style="font-size: 19px; line-height: 1.85; color: #334155; max-width: 700px; margin: 12px auto 18px auto; font-weight: 700;">
-                                ${customReason}
-                            </p>
-
-                            <!-- Classical Arabic Poetic Verse Box -->
-                            <div style="max-width: 640px; margin: 0 auto 22px auto; padding: 10px 20px; background: rgba(180, 83, 9, 0.07); border-right: 4px solid #b45309; border-left: 4px solid #b45309; border-radius: 10px;">
-                                <p class="font-amiri" style="font-size: 18px; font-weight: 700; color: #78350f; margin: 0;">
-                                    « ${poemVerse} »
+                            <div>
+                                <!-- Literary Preamble -->
+                                <p class="font-amiri" style="font-size: 19px; line-height: 1.65; color: #1e293b; max-width: 760px; margin: 0 auto 8px auto; font-weight: 700;">
+                                    يَسُرُّ أُسْرَةَ <span style="color: #b45309;">${header.subject}</span> تَحْتَ إِشْرَافِ <span style="color: #78350f;">${header.teacher}</span> أَنْ تَمْنَحَ هَذِهِ الشَّهَادَةَ المَلَكِيَّةَ وَوِسَامَ الشَّرَفِ إِلَى الفَارِسِ النَّجِيبِ / الطَّالِبِ المُمَيَّزِ:
                                 </p>
+
+                                <!-- Honored Student Name Banner -->
+                                <div style="margin: 8px auto; max-width: 540px; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%); border: 3px double #b45309; border-radius: 16px; padding: 8px 22px;">
+                                    <div class="font-ruqaa" style="font-size: 32px; font-weight: 700; color: #78350f; line-height: 1.25;">
+                                        ${studentName}
+                                    </div>
+                                    <div style="font-size: 12px; font-weight: 800; color: #92400e; margin-top: 2px;">الرتبة الحالية: ${rank.badge}</div>
+                                </div>
+
+                                <!-- Custom Citation Text -->
+                                <p class="font-amiri" style="font-size: 18px; line-height: 1.7; color: #334155; max-width: 780px; margin: 8px auto 10px auto; font-weight: 700;">
+                                    ${customReason}
+                                </p>
+
+                                <!-- Classical Arabic Poetic Verse Box -->
+                                <div style="max-width: 680px; margin: 0 auto 8px auto; padding: 7px 18px; background: rgba(180, 83, 9, 0.07); border-right: 4px solid #b45309; border-left: 4px solid #b45309; border-radius: 10px;">
+                                    <p class="font-amiri" style="font-size: 17px; font-weight: 700; color: #78350f; margin: 0;">
+                                        « ${poemVerse} »
+                                    </p>
+                                </div>
                             </div>
 
                             <!-- Footer: Signature, Royal Daad Wax Seal, and Date -->
-                            <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1.5px solid rgba(180, 83, 9, 0.35);">
+                            <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; margin-top: 4px; padding-top: 8px; border-top: 1.5px solid rgba(180, 83, 9, 0.35);">
                                 <!-- Right: Teacher Signature -->
                                 <div style="text-align: center;">
-                                    <div style="font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 4px;">معلم اللغة العربية وآدابها</div>
-                                    <div class="font-ruqaa" style="font-size: 26px; font-weight: 700; color: #78350f;">${header.teacher}</div>
-                                    <div style="width: 140px; height: 1.5px; background: #b45309; margin: 6px auto 0 auto;"></div>
+                                    <div style="font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 2px;">معلم اللغة العربية وآدابها</div>
+                                    <div class="font-ruqaa" style="font-size: 24px; font-weight: 700; color: #78350f;">${header.teacher}</div>
+                                    <div style="width: 140px; height: 1.5px; background: #b45309; margin: 4px auto 0 auto;"></div>
                                 </div>
 
                                 <!-- Center: Golden Royal Seal of Arabic Language -->
                                 <div class="royal-seal">
-                                    <div class="font-kufi" style="font-size: 10px; font-weight: 700; color: #fffbeb;">ختم التميز الملكي</div>
-                                    <div class="font-ruqaa" style="font-size: 32px; font-weight: 700; color: #fffbeb; line-height: 1.1;">ض</div>
-                                    <div style="font-size: 9px; font-weight: 900; color: #451a03; margin-top: 2px;">فرسان لغة الضاد</div>
+                                    <div class="font-kufi" style="font-size: 9px; font-weight: 700; color: #fffbeb;">ختم التميز الملكي</div>
+                                    <div class="font-ruqaa" style="font-size: 28px; font-weight: 700; color: #fffbeb; line-height: 1.05;">ض</div>
+                                    <div style="font-size: 8px; font-weight: 900; color: #451a03; margin-top: 2px;">فرسان لغة الضاد</div>
                                 </div>
 
                                 <!-- Left: Date & Academic Year -->
                                 <div style="text-align: center;">
-                                    <div style="font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 4px;">تاريخ الإصدار والاعتماد</div>
+                                    <div style="font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 2px;">تاريخ الإصدار والاعتماد</div>
                                     <div style="font-size: 14px; font-weight: 900; color: #78350f;">${todayStr}</div>
                                     <div style="font-size: 12px; font-weight: 700; color: #92400e; margin-top: 2px;">العام الدراسي: ${header.year}</div>
                                 </div>
@@ -2342,9 +2410,47 @@
 
             if (mode === 'certificate') {
                 printArea.innerHTML = `
-                    <div style="padding: 4mm;">
-                        ${buildRoyalCertificateMarkup()}
-                    </div>
+                    <style>
+                        @media print {
+                            @page {
+                                size: A4 landscape;
+                                margin: 0mm;
+                            }
+                            html, body {
+                                width: 297mm !important;
+                                height: 210mm !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                overflow: hidden !important;
+                                background: #ffffff !important;
+                            }
+                            #printableArea {
+                                width: 297mm !important;
+                                height: 210mm !important;
+                                padding: 6mm !important;
+                                margin: 0 !important;
+                                box-sizing: border-box !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                justify-content: center !important;
+                                page-break-after: avoid !important;
+                                page-break-inside: avoid !important;
+                                break-inside: avoid !important;
+                            }
+                            #printableArea .royal-certificate {
+                                width: 100% !important;
+                                height: 100% !important;
+                                max-width: none !important;
+                                aspect-ratio: auto !important;
+                                margin: 0 !important;
+                                box-shadow: none !important;
+                                border-radius: 12px !important;
+                                page-break-inside: avoid !important;
+                                break-inside: avoid !important;
+                            }
+                        }
+                    </style>
+                    ${buildRoyalCertificateMarkup()}
                 `;
                 window.print();
                 return;
@@ -3599,8 +3705,8 @@
                     ${buildDayCell('wed')}
                     ${buildDayCell('thu')}
                     <td class="p-3.5 text-center">
-                        <button type="button" onclick="toggleWeeklyHomeworkByIndex(${rIdx})" class="px-3 py-1.5 rounded-xl text-xs font-bold border transition ${st.hw ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-slate-900 text-slate-400 border-slate-700 hover:border-amber-500/40'}">
-                            ${st.hw ? '✅ تم التسليم' : '⬜ لم يُسلم'}
+                        <button type="button" onclick="toggleWeeklyHomeworkByIndex(${rIdx})" class="px-3.5 py-1.5 rounded-xl text-xs font-black border transition transform active:scale-95 ${st.hw ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.5)]' : 'bg-slate-900 text-slate-400 border-slate-700 hover:border-amber-500/40'}">
+                            ${st.hw ? '✅ تم التسليم (+1⭐)' : '⬜ لم يُسلم'}
                         </button>
                     </td>
                     <td class="p-3.5 text-center">
@@ -3609,12 +3715,13 @@
                                 <input type="text" value="${st.quiz !== undefined ? st.quiz : ''}" ${!isTeacherMode ? 'readonly' : ''} onchange="updateWeeklyQuizByIndex(${rIdx}, this.value)" placeholder="الدرجة" class="${qMeta.inputClass} border-2 rounded-lg px-2 py-1 font-black text-xs text-center w-16 focus:outline-none focus:border-amber-400">
                                 <span class="text-xs text-slate-400 font-bold">/ ${maxQuiz}</span>
                             </div>
-                            ${qPct !== null ? `<span class="text-[10px] font-black px-2 py-0.5 rounded-full border ${qMeta.badgeClass}">${qMeta.dot} ${qMeta.pctText} ${qMeta.bonusStars > 0 ? '(+3⭐)' : ''}</span>` : ''}
+                            ${qPct !== null ? `<span class="text-[10px] font-black px-2 py-0.5 rounded-full border ${qMeta.badgeClass}">${qMeta.dot} ${qMeta.pctText} ${qMeta.starText}</span>` : ''}
                         </div>
                     </td>
                     <td class="p-3.5 text-center">
-                        <div class="font-black text-amber-400 text-lg">${weekStars} / 25 ⭐</div>
-                        <div class="text-[11px] text-slate-400 font-semibold">(${completedDays} / 5 أيام مكتملة)</div>
+                        <div class="font-black text-amber-400 text-lg">${weekStars + (st.hw ? 1 : 0) + (qMeta.bonusStars || 0)} ⭐</div>
+                        <div class="text-[10px] text-slate-300 font-bold mt-0.5">أيام: ${weekStars} | واجب: +${st.hw ? 1 : 0} | تقييم: +${qMeta.bonusStars || 0}</div>
+                        <div class="text-[10px] text-slate-400">(${completedDays} / 5 أيام مكتملة)</div>
                     </td>
                     <td class="p-3.5 text-center">
                         <input type="text" value="${st.prize || ''}" ${!isTeacherMode ? 'readonly' : ''} onchange="updateTrackerPrizeByIndex(${rIdx}, this.value)" placeholder="جائزة الأسبوع..." class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-amber-300 text-sm text-center w-36 focus:outline-none focus:border-amber-500">
@@ -3804,7 +3911,7 @@
                                 <input type="text" value="${st.exam !== undefined ? st.exam : ''}" ${!isTeacherMode ? 'readonly' : ''} onchange="updateMonthlyFieldByIndex(${rIdx}, 'exam', this.value)" placeholder="الدرجة" class="${eMeta.inputClass} border-2 rounded-lg px-2.5 py-1 font-black text-sm text-center w-20 focus:outline-none focus:border-amber-400">
                                 <span class="text-xs text-slate-400 font-bold">/ ${maxExam}</span>
                             </div>
-                            ${ePct !== null ? `<span class="text-[10px] font-black px-2.5 py-0.5 rounded-full border ${eMeta.badgeClass}">${eMeta.dot} ${eMeta.pctText} ${eMeta.bonusStars > 0 ? '(+3⭐)' : ''}</span>` : ''}
+                            ${ePct !== null ? `<span class="text-[10px] font-black px-2.5 py-0.5 rounded-full border ${eMeta.badgeClass}">${eMeta.dot} ${eMeta.pctText} ${eMeta.starText}</span>` : ''}
                         </div>
                     </td>
                     <td class="p-3.5 text-center">
@@ -3946,10 +4053,10 @@
                             <div class="text-xs text-slate-400 font-bold">الغياب والاستئذان</div>
                             <div class="text-base font-black text-emerald-400 mt-1">غياب: ${stats.absentDays} | استئذان: ${stats.excusedDays}</div>
                         </div>
-                        <div class="bg-slate-800/90 p-3.5 rounded-xl border border-amber-500/30 text-center">
+                        <div class="bg-slate-800/90 p-3.5 rounded-xl border border-emerald-500/40 text-center">
                             <div class="text-2xl mb-1">📓</div>
-                            <div class="text-xs text-slate-400 font-bold">الواجبات المسلمة</div>
-                            <div class="text-base font-black text-amber-300 mt-1">${stats.hwCompleted} واجب مكتمل</div>
+                            <div class="text-xs text-slate-400 font-bold">الواجبات الأسبوعية المسلمة</div>
+                            <div class="text-base font-black text-emerald-300 mt-1">✅ ${stats.hwCompleted} واجب (+${stats.hwBonusStars}⭐)</div>
                         </div>
                         <div class="bg-slate-800/90 p-3.5 rounded-xl border border-indigo-500/30 text-center">
                             <div class="text-2xl mb-1">📝</div>
@@ -3966,17 +4073,26 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex flex-col justify-center items-center text-center">
                             <span class="text-3xl mb-1">⭐</span>
-                            <h4 class="text-slate-300 text-sm font-bold mb-1">إجمالي النجوم الكلي (شامل مكافآت التقييم)</h4>
+                            <h4 class="text-slate-300 text-sm font-bold mb-1">إجمالي رصيد النجوم الكلي والترقية التلقائية</h4>
                             <div class="text-4xl font-black text-amber-400 my-1.5">${totalStarsCount} <span class="text-lg text-slate-300">نجمة</span></div>
                             <div class="flex flex-wrap justify-center gap-2 my-2 text-xs font-bold">
-                                <span class="bg-slate-900 text-slate-300 px-3 py-1 rounded-lg border border-slate-700">
+                                <span class="bg-slate-900 text-amber-300 px-3 py-1 rounded-lg border border-amber-500/30">
                                     📅 نجوم الأيام: ${calculateStudentDailyStarsOnly(studentName)} ⭐
                                 </span>
+                                <span class="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-lg border border-emerald-400/50">
+                                    ✅ مكافأة الواجبات: +${stats.hwBonusStars} ⭐
+                                </span>
                                 <span class="bg-sky-500/20 text-sky-300 px-3 py-1 rounded-lg border border-sky-400/50">
-                                    🔵 مكافأة التفوق بالتقييمات: +${stats.bonusStars} ⭐ (${stats.blueCount}×3)
+                                    💎🔵🟢 مكافأة التقييمات: +${stats.evalBonusStars} ⭐
                                 </span>
                             </div>
-                            <div class="mt-1 px-3 py-1 rounded-full text-xs font-black border ${stats.overallColor.badgeClass}">
+                            <div class="flex flex-wrap justify-center gap-1.5 my-1 text-[11px] font-bold">
+                                <span class="bg-cyan-500/15 text-cyan-200 px-2 py-0.5 rounded border border-cyan-400/40">💎 100%: ${stats.diamondCount} (+3⭐)</span>
+                                <span class="bg-sky-500/15 text-sky-300 px-2 py-0.5 rounded border border-sky-400/40">🔵 85%+: ${stats.blueCount} (+2⭐)</span>
+                                <span class="bg-emerald-500/15 text-emerald-300 px-2 py-0.5 rounded border border-emerald-400/40">🟢/🟡 50%+: ${stats.greenYellowCount} (+1⭐)</span>
+                                <span class="bg-rose-500/15 text-rose-300 px-2 py-0.5 rounded border border-rose-400/40">🔴 &lt;50%: ${stats.redCount} (0⭐)</span>
+                            </div>
+                            <div class="mt-2 px-3 py-1 rounded-full text-xs font-black border ${stats.overallColor.badgeClass}">
                                 مستوى التقييم العام: ${stats.overallColor.dot} ${stats.overallColor.label} ${stats.overallColor.pctText ? `(${stats.overallColor.pctText})` : ''}
                             </div>
                         </div>
@@ -4551,7 +4667,10 @@
             <p class="text-[11px] text-amber-400 mt-1.5 font-bold">🔒 الشهادة غير قابلة للتعديل إلا في وضع المعلم.</p>
         </div>
 
-        <div class="flex justify-end gap-2">
+        <div class="flex flex-wrap justify-end gap-2">
+            <button type="button" onclick="copyParentReportText()" id="copyParentReportBtn" class="bg-amber-500 hover:bg-amber-400 text-slate-900 font-black px-4 py-2 rounded-xl text-xs transition shadow flex items-center gap-1.5">
+                <span>📋</span> نسخ التقرير (جاهز للواتساب)
+            </button>
             <button type="button" onclick="printParentCertificate()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2 rounded-xl text-xs transition shadow flex items-center gap-1.5">
                 <span>🖨️</span> طباعة الشهادة (A5 أفقي)
             </button>
@@ -4621,7 +4740,11 @@
 <script>
     // دالة حفظ الصفحة كـ PDF
     function exportPageAsPDF() {
-        window.print();
+        if (typeof currentView !== 'undefined' && currentView === 'certificate') {
+            printClassroomSheet('certificate');
+        } else {
+            window.print();
+        }
     }
 
     // ==========================================
@@ -4668,15 +4791,36 @@
         if (!select || !textElem || !select.value) return;
 
         const studentName = select.value;
-        const totalStars = typeof calculateStudentTotalScore === 'function' ? calculateStudentTotalScore(studentName) : 0;
+        const dailyStars = typeof calculateStudentDailyStarsOnly === 'function' ? calculateStudentDailyStarsOnly(studentName) : 0;
+        const stats = typeof getStudentAcademicStats === 'function' ? getStudentAcademicStats(studentName) : { absentDays: 0, excusedDays: 0, hwCompleted: 0, hwBonusStars: 0, evalBonusStars: 0, avgQuiz: 'لم يُرصد', currentMonthExam: 'لم يُرصد' };
+        const hwStars = stats.hwBonusStars || 0;
+        const evalStars = stats.evalBonusStars || 0;
+        const totalStars = dailyStars + hwStars + evalStars;
         const rank = typeof getStudentKnightRank === 'function' ? getStudentKnightRank(studentName) : { title: 'فارس الحرف', badge: '⚔️ فارس الحرف' };
         const group = typeof getStudentGroupName === 'function' ? getStudentGroupName(studentName) : 'مجموعته';
         const className = typeof currentClass !== 'undefined' ? getCurrentClassDisplayName() : 'الثاني الإعدادي';
-        const stats = typeof getStudentAcademicStats === 'function' ? getStudentAcademicStats(studentName) : { absentDays: 0, excusedDays: 0, hwCompleted: 0, avgQuiz: 'لم يُرصد', currentMonthExam: 'لم يُرصد' };
 
-        const msg = `تحية طيبة ولي الأمر الفاضل 🌹\n\nنحيطكم علماً بمستوى ابننا/ابنتنا المميز: ${studentName} (فصل ${className})\n\n🛡️ الرتبة الحالية: ${rank.badge} (${rank.title}) | 👥 المجموعة: ${group}\n📋 الغياب: (${stats.absentDays} أيام) | 📓 الواجبات المسلمة: (${stats.hwCompleted})\n📝 متوسط التقييم الأسبوعي: (${stats.avgQuiz}) | 📄 درجة اختبار الشهر: (${stats.currentMonthExam})\n⭐ إجمالي النجوم المكتسبة: (${totalStars} نجمة)\n\nنشكر لكم دعمكم المستمر ومتابعتكم الرائعة معنا في مادة اللغة العربية.\nمع أطيب تمنياتنا بدوام التميز والنجاح 🌟`;
+        const msg = `تحية طيبة ولي الأمر الفاضل 🌹\n\nنحيطكم علماً بمستوى ابننا/ابنتنا المميز: ${studentName} (فصل ${className})\n\n🛡️ الرتبة الحالية (ترقية تلقائية): ${rank.badge} (${rank.title}) | 👥 المجموعة: ${group}\n📋 الغياب: (${stats.absentDays} أيام) | 📓 الواجبات المسلمة: (${stats.hwCompleted} واجب = +${hwStars}⭐)\n📝 متوسط التقييم الأسبوعي: (${stats.avgQuiz}) | 📄 درجة اختبار الشهر: (${stats.currentMonthExam})\n⭐ إجمالي الرصيد الكلي: (${totalStars} نجمة)\n📊 تفصيل النجوم: (نجوم الأيام: ${dailyStars}⭐ + مكافأة الواجبات: +${hwStars}⭐ + مكافأة التقييمات: +${evalStars}⭐)\n\nنشكر لكم دعمكم المستمر ومتابعتكم الرائعة معنا في مادة اللغة العربية.\nمع أطيب تمنياتنا بدوام التميز والنجاح 🌟`;
 
         textElem.value = msg;
+    }
+
+    function copyParentReportText() {
+        const textElem = document.getElementById('parentCertText');
+        if (!textElem || !textElem.value) return;
+        navigator.clipboard.writeText(textElem.value).then(() => {
+            const btn = document.getElementById('copyParentReportBtn');
+            if (btn) {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<span>✅</span> تم النسخ بنجاح!';
+                setTimeout(() => { btn.innerHTML = orig; }, 2000);
+            }
+            if (typeof triggerConfetti === 'function') triggerConfetti({ particleCount: 40, spread: 60 });
+        }).catch(() => {
+            textElem.select();
+            document.execCommand('copy');
+            alert('✅ تم نسخ تقرير ولي الأمر إلى الحافظة!');
+        });
     }
 
     function printParentCertificate() {
@@ -4748,7 +4892,7 @@
         return list.length > 0 ? list : default16;
     }
 
-    function calculateStudentStarsByPeriod(cls, studentName, period, subFilterValue) {
+    function calculateStudentStarsBreakdownByPeriod(cls, studentName, period, subFilterValue) {
         let targetWeeks = [];
         const allClassWeeks = getClassWeeksByKey(cls);
 
@@ -4768,28 +4912,36 @@
             targetWeeks = allClassWeeks;
         }
 
-        let stars = 0;
+        let dailyStars = 0;
+        let hwStars = 0;
+        let evalStars = 0;
         const days = ['sun', 'mon', 'tue', 'wed', 'thu'];
+
         targetWeeks.forEach(w => {
             const wTracker = safeGet(`weekly_tracker_${cls}_${w}`, {}, 'object');
             const maxQuiz = parseFloat(wTracker._maxQuiz) > 0 ? parseFloat(wTracker._maxQuiz) : 10;
             if (wTracker[studentName]) {
+                if (wTracker[studentName].hw) {
+                    hwStars += 1;
+                }
                 const qPct = calcScorePercentage(wTracker[studentName].quiz, maxQuiz);
-                if (qPct !== null && qPct >= 85) {
-                    stars += 3;
+                if (qPct !== null) {
+                    const qMeta = getGradeColorMeta(qPct);
+                    evalStars += (qMeta.bonusStars || 0);
                 }
             }
 
             days.forEach(d => {
                 const dailyTracker = safeGet(`daily_tracker_${cls}_${w}_${d}`, {}, 'object');
                 const st = dailyTracker[studentName];
+                let dSum = 0;
                 if (st) {
-                    if (st.p1) stars++;
-                    if (st.p2) stars++;
-                    if (st.p3) stars++;
-                    if (st.p4) stars++;
-                    if (st.p5) stars++;
+                    dSum = (st.p1 ? 1 : 0) + (st.p2 ? 1 : 0) + (st.p3 ? 1 : 0) + (st.p4 ? 1 : 0) + (st.p5 ? 1 : 0);
                 }
+                if (dSum === 0 && wTracker[studentName] && wTracker[studentName][d]) {
+                    dSum = 5;
+                }
+                dailyStars += dSum;
             });
         });
 
@@ -4808,13 +4960,23 @@
             const maxExam = parseFloat(mTracker._maxExam) > 0 ? parseFloat(mTracker._maxExam) : 20;
             if (mTracker[studentName]) {
                 const ePct = calcScorePercentage(mTracker[studentName].exam, maxExam);
-                if (ePct !== null && ePct >= 85) {
-                    stars += 3;
+                if (ePct !== null) {
+                    const eMeta = getGradeColorMeta(ePct);
+                    evalStars += (eMeta.bonusStars || 0);
                 }
             }
         });
 
-        return stars;
+        return {
+            dailyStars,
+            hwStars,
+            evalStars,
+            total: dailyStars + hwStars + evalStars
+        };
+    }
+
+    function calculateStudentStarsByPeriod(cls, studentName, period, subFilterValue) {
+        return calculateStudentStarsBreakdownByPeriod(cls, studentName, period, subFilterValue).total;
     }
 
     function getKnightRankByScore(totalYearStars) {
@@ -4931,14 +5093,17 @@
             const clsDisplayName = typeof getCurrentClassDisplayName === 'function' ? getCurrentClassDisplayName(cls) : cls.toUpperCase();
 
             roster.forEach(name => {
-                const periodScore = calculateStudentStarsByPeriod(cls, name, podiumPeriod, subFilterValue);
+                const breakdown = calculateStudentStarsBreakdownByPeriod(cls, name, podiumPeriod, subFilterValue);
                 const totalYearScore = calculateStudentStarsByPeriod(cls, name, 'year', '');
                 const rank = getKnightRankByScore(totalYearScore);
 
                 allCandidates.push({
                     name: name,
                     className: clsDisplayName,
-                    score: periodScore,
+                    score: breakdown.total,
+                    dailyStars: breakdown.dailyStars,
+                    hwStars: breakdown.hwStars,
+                    evalStars: breakdown.evalStars,
                     totalYearScore: totalYearScore,
                     isHonored: honorNames.includes(name),
                     rank: rank
@@ -4966,15 +5131,18 @@
         const buildPodiumCard = (student, placeNum, colors, heightClass, icon) => `
             <div class="flex flex-col items-center order-${placeNum === 1 ? '1 md:order-2' : (placeNum === 2 ? '2 md:order-1' : '3 md:order-3')} transform ${placeNum === 1 ? 'scale-105 md:scale-110 z-10' : 'scale-95'} transition duration-500 hover:scale-110">
                 <div class="text-4xl mb-2">${icon}</div>
-                <div class="${colors.bg} ${colors.border} border-2 rounded-2xl p-4 shadow-2xl flex flex-col items-center justify-center w-44 sm:w-52 ${heightClass}">
-                    <span class="text-[11px] font-black bg-slate-900/90 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 rounded-full mb-1.5">
+                <div class="${colors.bg} ${colors.border} border-2 rounded-2xl p-4 shadow-2xl flex flex-col items-center justify-center w-52 sm:w-60 ${heightClass}">
+                    <span class="text-[11px] font-black bg-slate-900/90 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 rounded-full mb-1">
                         فصل ${student.className}
                     </span>
-                    <h3 class="text-white font-black text-base sm:text-lg text-center mb-1 leading-tight">${student.name}</h3>
-                    <div class="text-[10px] font-bold ${colors.text} mb-2.5 text-center">${student.rank.badge}</div>
-                    <div class="bg-slate-900/85 px-3.5 py-1 rounded-xl border border-slate-700/60">
+                    <h3 class="text-white font-black text-base sm:text-lg text-center mb-0.5 leading-tight">${student.name}</h3>
+                    <div class="text-[10px] font-bold ${colors.text} mb-2 text-center">${student.rank.badge}</div>
+                    <div class="bg-slate-900/85 px-3.5 py-1 rounded-xl border border-slate-700/60 mb-1.5">
                         <span class="font-black text-xl text-white">${student.score}</span>
                         <span class="text-xs ${colors.text}">⭐ نجمة</span>
+                    </div>
+                    <div class="text-[10px] font-bold text-slate-200 bg-slate-950/75 px-2.5 py-1 rounded-lg border border-slate-700/70 w-full text-center leading-relaxed">
+                        أيام: ${student.dailyStars}⭐ | واجب: +${student.hwStars}⭐ | تقييم: +${student.evalStars}⭐
                     </div>
                 </div>
                 <div class="mt-3 font-black ${colors.text} text-lg md:text-xl drop-shadow-md">
@@ -4983,9 +5151,9 @@
             </div>
         `;
 
-        if (top3[1]) podiumContainer.innerHTML += buildPodiumCard(top3[1], 2, {bg: 'bg-slate-400/20', border: 'border-slate-300', text: 'text-slate-300'}, 'h-44', '🥈');
-        if (top3[0]) podiumContainer.innerHTML += buildPodiumCard(top3[0], 1, {bg: 'bg-amber-500/20', border: 'border-amber-400', text: 'text-amber-400'}, 'h-52', '👑');
-        if (top3[2]) podiumContainer.innerHTML += buildPodiumCard(top3[2], 3, {bg: 'bg-orange-600/20', border: 'border-orange-500', text: 'text-orange-400'}, 'h-40', '🥉');
+        if (top3[1]) podiumContainer.innerHTML += buildPodiumCard(top3[1], 2, {bg: 'bg-slate-400/20', border: 'border-slate-300', text: 'text-slate-300'}, 'min-h-[13rem]', '🥈');
+        if (top3[0]) podiumContainer.innerHTML += buildPodiumCard(top3[0], 1, {bg: 'bg-amber-500/20', border: 'border-amber-400', text: 'text-amber-400'}, 'min-h-[14.5rem]', '👑');
+        if (top3[2]) podiumContainer.innerHTML += buildPodiumCard(top3[2], 3, {bg: 'bg-orange-600/20', border: 'border-orange-500', text: 'text-orange-400'}, 'min-h-[12rem]', '🥉');
     }
 
     function showWelcomeTopStudents() {
